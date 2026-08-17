@@ -97,3 +97,15 @@ FPL_API_BASE_URL = os.environ.get(
     "FPL_API_BASE_URL", "https://fantasy.premierleague.com/api"
 )
 FPL_CACHE_TTL_SECONDS = int(os.environ.get("FPL_CACHE_TTL_SECONDS", "3600"))
+
+# suggest-best-squad: how long ingested global FPL data (player pool, teams,
+# per-player history, fixtures) is considered fresh before a refresh re-fetches
+# it. Deliberately longer than FPL_CACHE_TTL_SECONDS (per-entry data) - the
+# global player pool changes far less often than one team's picks/history.
+FPL_GLOBAL_DATA_FRESHNESS_SECONDS = int(
+    os.environ.get("FPL_GLOBAL_DATA_FRESHNESS_SECONDS", str(24 * 60 * 60))
+)
+
+# Default number of upcoming gameweeks a strategy's fixture-difficulty term
+# averages over when a strategy doesn't specify its own horizon.
+DEFAULT_FIXTURE_HORIZON = int(os.environ.get("DEFAULT_FIXTURE_HORIZON", "5"))

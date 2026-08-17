@@ -31,6 +31,10 @@ EXPECTED_FIELDS = {
     ],
     "picks": ["picks", "entry_history"],
     "history": ["current", "past", "chips"],
+    # suggest-best-squad: global (non-per-entry) resources.
+    "bootstrap_static": ["events", "teams", "elements"],
+    "element_summary": ["fixtures", "history", "history_past"],
+    "fixtures": ["id", "event", "team_h", "team_a"],
 }
 
 
@@ -56,6 +60,14 @@ class FplClient:
             time.sleep(MIN_REQUEST_INTERVAL_SECONDS - elapsed)
 
     def _check_expected_fields(self, data, resource_type, path):
+        # `fixtures` returns a JSON array rather than an object - check
+        # shape against the first element, since an empty list has nothing
+        # to drift and isn't itself a shape problem.
+        if isinstance(data, list):
+            if not data:
+                return
+            data = data[0]
+
         for field in EXPECTED_FIELDS.get(resource_type, []):
             if field not in data:
                 logger.warning(
@@ -116,6 +128,24 @@ class FplClient:
 
     def get_entry_history(self, team_id):
         return self._get(f"/entry/{team_id}/history/", expected_key="history")
+
+    def get_bootstrap_static(self):
+        """Global player pool, teams, and gameweek (event) list."""
+        return self._get("/bootstrap-static/", expected_key="bootstrap_static")
+
+    def get_fixtures(self):
+        """Global fixture list for the season."""
+        return self._get("/fixtures/", expected_key="fixtures")
+
+    def get_element_summary(self, player_id):
+        """
+        Per-player current-season history, past-season history, and
+        upcoming fixtures. Despite the per-player URL shape, this is a
+        *global* resource (any player, not a connected user's own entry) -
+        paced through the same client as everything else per the module
+        docstring.
+        """
+        return self._get(f"/element-summary/{player_id}/", expected_key="element_summary")
 
     def validate_team_id(self, team_id):
         try:
