@@ -5,7 +5,10 @@ meta:
   id: wrk_10ab7f9d2b1746eb8bee239350e645f1
   created: 1786983473763
   modified: 1786984005000
-  description: Endpoints from the connect-fpl-team openspec change - connect a public FPL Team ID (no login), then read that team's public squad/history/budget. Read-only, no write actions against a real FPL team. Run `docker compose up -d` then `python manage.py runserver` in fpl-buddy-api/ before using this collection.
+  description: |-
+    Endpoints from the connect-fpl-team and suggest-best-squad openspec changes. connect-fpl-team: connect a public FPL Team ID (no login), then read that team's public squad/history/budget. suggest-best-squad: read-only player scores/shortlists/suggested squads produced by the deterministic scoring+ILP pipeline (no LLM). Read-only throughout, no write actions against a real FPL team.
+
+    Run `docker compose up -d` then `python manage.py runserver` in fpl-buddy-api/ before using this collection. The suggest-best-squad requests need data to already exist - run `python manage.py ingest_fpl_data`, then `python manage.py score_players`, then `python manage.py build_squads` first; otherwise they return `{"available": false, ...}`.
 collection:
   - url: "{{ _.base_url }}/connect/"
     name: Connect (find-or-create by FPL Team ID)
@@ -115,6 +118,96 @@ collection:
         send: true
         store: true
       rebuildPath: true
+  - url: "{{ _.base_url }}/players/scores/"
+    name: Get Player Scores
+    meta:
+      id: req_5f3a19c7de6b4a2f8b0c6e9d1a7f2c34
+      created: 1786984009000
+      modified: 1786984009000
+      isPrivate: false
+      description: |-
+        Every scored player from the latest ScoringRun for the given strategy, with every component (not just the total) - expected/realized/regression/fixture/setpiece/ownership/rotation, plus availability/discipline multipliers and the has_history flag. Sorted by total_score descending. No session required; never contacts FPL or the solver - serves stored data only.
+
+        Run `manage.py score_players` first (see collection description).
+
+        Response 200 (available): {"available": true, "strategy": <str>, "run_id": <int>, "generated_at": <iso8601>, "players": [{"id", "web_name", "team", "position", "price_tenths", "total_score", "next_gw_score", "expected_component", "realized_component", "regression_signal", "fixture_component", "setpiece_component", "ownership_component", "rotation_component", "has_history"}, ...]}
+        Response 200 (no run yet): {"available": false, "message": "..."}
+      sortKey: -1786984009000
+    method: GET
+    parameters:
+      - name: strategy
+        value: "{{ _.strategy }}"
+        disabled: false
+    headers: []
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ _.base_url }}/players/shortlist/"
+    name: Get Shortlist
+    meta:
+      id: req_7c1e84b2f96a4d3e9c5f0a8b2d6e4f18
+      created: 1786984010000
+      modified: 1786984010000
+      isPrivate: false
+      description: |-
+        Per-position ranked shortlist (top `top_n` per position, default 15) from the latest ScoringRun for the given strategy. No session required; serves stored data only.
+
+        Run `manage.py score_players` first (see collection description).
+
+        Response 200 (available): {"available": true, "strategy": <str>, "run_id": <int>, "shortlist": {"<position_code>": [{"id", "web_name", "team", "position", "price_tenths", "total_score"}, ...], ...}} (position_code: 1=GKP, 2=DEF, 3=MID, 4=FWD)
+        Response 200 (no run yet): {"available": false, "message": "..."}
+      sortKey: -1786984010000
+    method: GET
+    parameters:
+      - name: strategy
+        value: "{{ _.strategy }}"
+        disabled: false
+      - name: top_n
+        value: "15"
+        disabled: false
+    headers: []
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ _.base_url }}/squads/"
+    name: Get Suggested Squads
+    meta:
+      id: req_9d2f57a4c81b4e6f9a3d7c0b5e8f1a26
+      created: 1786984011000
+      modified: 1786984011000
+      isPrivate: false
+      description: |-
+        The latest suggested squad for one strategy, or (with `strategy` disabled/omitted) for every configured strategy at once - full composition: starters, ranked bench (goalkeeper + 3 outfield), formation, total price, and all three captain recommendations (season/next_gw/differential, each with a vice-captain). Differential captain is null if no starter falls below the ownership threshold. No session required; serves stored data only.
+
+        Run `manage.py score_players` then `manage.py build_squads` first (see collection description).
+
+        Response 200 (available): {"available": true, "squads": [{"strategy", "formation", "total_price_tenths", "starters": [...], "bench": {"goalkeeper": {...}, "outfield": [...]}, "captains": {"season": {...}, "next_gw": {...}, "differential": {...}|null}}, ...]}
+        Response 200 (no squads yet): {"available": false, "message": "..."}
+      sortKey: -1786984011000
+    method: GET
+    parameters:
+      - name: strategy
+        value: "{{ _.strategy }}"
+        disabled: true
+    headers: []
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
 cookieJar:
   name: Default Jar
   meta:
@@ -131,3 +224,4 @@ environments:
   data:
     base_url: http://127.0.0.1:8000
     fpl_team_id: 1
+    strategy: balanced
