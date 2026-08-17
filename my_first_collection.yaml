@@ -1,31 +1,112 @@
 type: collection.insomnia.rest/5.0
 schema_version: "5.1"
-name: My first collection
+name: FPL Buddy API
 meta:
   id: wrk_10ab7f9d2b1746eb8bee239350e645f1
   created: 1786983473763
-  modified: 1786983473763
-  description: ""
+  modified: 1786984005000
+  description: Endpoints from the connect-fpl-team openspec change - connect a public FPL Team ID (no login), then read that team's public squad/history/budget. Read-only, no write actions against a real FPL team. Run `docker compose up -d` then `python manage.py runserver` in fpl-buddy-api/ before using this collection.
 collection:
-  - url: http:///test
-    name: New Request
+  - url: "{{ _.base_url }}/connect/"
+    name: Connect (find-or-create by FPL Team ID)
     meta:
-      id: req_7941735b51134511a1e914886ddd9f71
-      created: 1786983479704
-      modified: 1786983527855
+      id: req_8ebc8ff4998e2b7d9a747d1814720ade
+      created: 1786984005000
+      modified: 1786984005000
       isPrivate: false
-      description: ""
-      sortKey: -1786983479704
-    method: GET
+      description: |-
+        POST a numeric FPL Team ID. Validates it against the live FPL API, finds-or-creates a `users` row keyed on it, and sets a session cookie so subsequent requests in this collection are recognized without resubmitting the ID.
+
+        Responses:
+        - 200: {"user_id": "<uuid>", "fpl_team_id": <int>}
+        - 400: fpl_team_id missing or not a positive integer
+        - 404: {"error": "no FPL entry found for that Team ID"}
+        - 502: could not verify the ID with FPL right now
+      sortKey: -1786984005000
+    method: POST
     body:
       mimeType: application/json
       text: |-
         {
-        	"me": "ayp"
+        	"fpl_team_id": {{ _.fpl_team_id }}
         }
     headers:
       - name: Content-Type
         value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ _.base_url }}/me/squad/"
+    name: Get Squad
+    meta:
+      id: req_a82686c93a2d38455f5124469a77b27d
+      created: 1786984006000
+      modified: 1786984006000
+      isPrivate: false
+      description: |-
+        Current squad: starters, bench, captain, vice-captain, for the connected team's current gameweek. Requires Connect to have been run first in this collection (401 otherwise).
+
+        Responses:
+        - 200 (picks locked): {"picks_available": true, "gw": <int>, "starters": [...], "bench": [...], "captain": <element_id>, "vice_captain": <element_id>}
+        - 200 (no gw yet, e.g. preseason or pre-deadline): {"picks_available": false, "gw": null|<int>, "message": "..."}
+        - 401: not connected - run Connect first
+        - 502: could not reach FPL right now
+      sortKey: -1786984006000
+    method: GET
+    headers: []
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ _.base_url }}/me/history/"
+    name: Get History
+    meta:
+      id: req_0e3249e096b3724f635c17d02b030e01
+      created: 1786984007000
+      modified: 1786984007000
+      isPrivate: false
+      description: |-
+        Season history: per-gameweek points/transfers/transfer cost for the current season, plus any chips activated. Requires Connect to have been run first.
+
+        Response 200: {"gw_history": [{"gw": <int>, "points": <int>, "transfers": <int>, "transfer_cost": <int>}, ...], "chips": [{"name": <str>, "gw": <int>}, ...]}
+
+        401 if not connected, 502 if FPL is unreachable.
+      sortKey: -1786984007000
+    method: GET
+    headers: []
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ _.base_url }}/me/budget/"
+    name: Get Budget
+    meta:
+      id: req_c965e910e5ab7ba62e4458580a59efd0
+      created: 1786984008000
+      modified: 1786984008000
+      isPrivate: false
+      description: |-
+        Remaining bank and total squad value, as of the last completed deadline. Values are in tenths of a million (FPL convention) - e.g. 1005 == £100.5m. Requires Connect to have been run first.
+
+        Response 200: {"bank_tenths": <int|null>, "squad_value_tenths": <int|null>} (null before the first deadline of a season has passed).
+
+        401 if not connected, 502 if FPL is unreachable.
+      sortKey: -1786984008000
+    method: GET
+    headers: []
     settings:
       renderRequestBody: true
       encodeUrl: true
@@ -45,5 +126,8 @@ environments:
   meta:
     id: env_db219af8f22d10d473c25ffbca2230a190077edc
     created: 1786983473827
-    modified: 1786983473827
+    modified: 1786984005000
     isPrivate: false
+  data:
+    base_url: http://127.0.0.1:8000
+    fpl_team_id: 1
